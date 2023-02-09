@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"github.com/holiman/uint256"
@@ -141,6 +142,7 @@ func (evm *EVM) ResetBetweenBlocks(blockCtx evmtypes.BlockContext, txCtx evmtype
 // Cancel cancels any running EVM operation. This may be called concurrently and
 // it's safe to be called multiple times.
 func (evm *EVM) Cancel() {
+	fmt.Println("hexo: evm cancelling")
 	atomic.StoreInt32(&evm.abort, 1)
 }
 
@@ -165,6 +167,7 @@ func (evm *EVM) Interpreter() Interpreter {
 }
 
 func (evm *EVM) call(typ OpCode, caller ContractRef, addr libcommon.Address, input []byte, gas uint64, value *uint256.Int, bailout bool) (ret []byte, leftOverGas uint64, err error) {
+	fmt.Printf("hexo: evm.call: %v, gas: %v, depth: %v \n", typ, gas, evm.interpreter.Depth())
 	if evm.config.NoRecursion && evm.interpreter.Depth() > 0 {
 		return nil, gas, nil
 	}
@@ -267,13 +270,16 @@ func (evm *EVM) call(typ OpCode, caller ContractRef, addr libcommon.Address, inp
 		if typ == STATICCALL {
 			readOnly = true
 		}
+		curDepth := evm.interpreter.Depth()
 		ret, err = run(evm, contract, input, readOnly)
 		gas = contract.Gas
+		fmt.Printf("hexo: contract gas after run: %v, depth: %v \n", gas, curDepth)
 	}
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally
 	// when we're in Homestead this also counts for code storage gas errors.
 	if err != nil || evm.config.RestoreState {
+		fmt.Printf("hexo: error in evm: %v \n", err)
 		evm.intraBlockState.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
 			gas = 0
@@ -282,6 +288,7 @@ func (evm *EVM) call(typ OpCode, caller ContractRef, addr libcommon.Address, inp
 		//} else {
 		//	evm.StateDB.DiscardSnapshot(snapshot)
 	}
+
 	return ret, gas, err
 }
 

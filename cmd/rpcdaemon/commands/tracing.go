@@ -99,6 +99,7 @@ func (api *PrivateDebugAPIImpl) traceBlock(ctx context.Context, blockNrOrHash rp
 	}
 
 	for idx, txn := range txns {
+		fmt.Printf("hexo: tracing tx %v \n", txn.Hash())
 		stream.WriteObjectStart()
 		stream.WriteObjectField("result")
 		select {

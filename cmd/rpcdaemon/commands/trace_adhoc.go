@@ -1137,7 +1137,9 @@ func (api *TraceAPIImpl) doCallMany(ctx context.Context, dbtx kv.Tx, msgs []type
 		useParent = true
 	}
 
+	fmt.Println("hexo: starting msg iteration")
 	for txIndex, msg := range msgs {
+		fmt.Printf("hexo: msg from: %v nonce: %v \n", msg.From(), msg.Nonce())
 		if err := libcommon.Stopped(ctx.Done()); err != nil {
 			return nil, err
 		}
@@ -1169,6 +1171,7 @@ func (api *TraceAPIImpl) doCallMany(ctx context.Context, dbtx kv.Tx, msgs []type
 				traceResult.VmTrace = &VmTrace{Ops: []*VmTraceOp{}}
 			}
 			vmConfig.Debug = true
+			fmt.Println("hexo: setting vm debug to true")
 			vmConfig.Tracer = &ot
 		}
 
@@ -1199,6 +1202,9 @@ func (api *TraceAPIImpl) doCallMany(ctx context.Context, dbtx kv.Tx, msgs []type
 			ibs.Prepare(libcommon.Hash{}, header.Hash(), txIndex)
 		}
 		execResult, err = core.ApplyMessage(evm, msg, gp, true /* refunds */, gasBailout /* gasBailout */)
+		if execResult != nil && execResult.Err != nil {
+			fmt.Printf("hexo: execResult err %v \n", execResult.Err)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("first run for txIndex %d error: %w", txIndex, err)
 		}

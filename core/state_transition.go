@@ -204,19 +204,24 @@ func (st *StateTransition) buyGas(gasBailout bool) error {
 	balanceCheck := mgval
 	if st.gasFeeCap != nil {
 		balanceCheck = st.sharedBuyGasBalance.SetUint64(st.msg.Gas())
+		fmt.Printf("hexo: balance check 1 %v \n", balanceCheck)
 		balanceCheck, overflow = balanceCheck.MulOverflow(balanceCheck, st.gasFeeCap)
 		if overflow {
 			return fmt.Errorf("%w: address %v", ErrInsufficientFunds, st.msg.From().Hex())
 		}
+		fmt.Printf("hexo: balance check 2 %v gasFeeCap: %v \n", balanceCheck, st.gasFeeCap)
 		balanceCheck, overflow = balanceCheck.AddOverflow(balanceCheck, st.value)
 		if overflow {
 			return fmt.Errorf("%w: address %v", ErrInsufficientFunds, st.msg.From().Hex())
 		}
+		fmt.Printf("hexo: balance check 3 %v value: %v \n", balanceCheck, st.value)
 	}
 	var subBalance = false
-	if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(want) < 0 {
+	have := st.state.GetBalance(st.msg.From())
+	fmt.Printf("hexo: account balance %v \n", have)
+	if have.Cmp(balanceCheck) < 0 {
 		if !gasBailout {
-			return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From().Hex(), have, want)
+			return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From().Hex(), have, balanceCheck)
 		}
 	} else {
 		subBalance = true
@@ -360,6 +365,7 @@ func (st *StateTransition) TransitionDb(refunds bool, gasBailout bool) (*Executi
 		return nil, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gas, gas)
 	}
 	st.gas -= gas
+	fmt.Printf("hexo: intrinsic gas %v \n", gas)
 
 	var bailout bool
 	// Gas bailout (for trace_call) should only be applied if there is not sufficient balance to perform value transfer
@@ -379,6 +385,7 @@ func (st *StateTransition) TransitionDb(refunds bool, gasBailout bool) (*Executi
 		st.state.PrepareAccessList(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
 		// EIP-3651 warm COINBASE
 		if rules.IsShanghai {
+			fmt.Println("hexo: warming coinbase up")
 			st.state.AddAddressToAccessList(st.evm.Context().Coinbase)
 		}
 	}
@@ -388,15 +395,19 @@ func (st *StateTransition) TransitionDb(refunds bool, gasBailout bool) (*Executi
 		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
 	)
 	if contractCreation {
+		fmt.Println("hexo: contract creation")
 		// The reason why we don't increment nonce here is that we need the original
 		// nonce to calculate the address of the contract that is being created
 		// It does get incremented inside the `Create` call, after the computation
 		// of the contract's address, but before the execution of the code.
 		ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, st.value)
 	} else {
+		fmt.Println("hexo: not contract creation")
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+		prevGas := st.gas
 		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value, bailout)
+		fmt.Printf("hexo: pre gas: %v, used: %v, left %v \n", prevGas, prevGas-st.gas, st.gas)
 	}
 	if refunds {
 		if rules.IsLondon {

@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"fmt"
 	"hash"
 
 	"github.com/ledgerwatch/erigon-lib/chain"
@@ -168,6 +169,7 @@ func NewEVMInterpreter(evm VMInterpreter, cfg Config) *EVMInterpreter {
 // ErrExecutionReverted which means revert-and-keep-gas-left.
 func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (ret []byte, err error) {
 	// Increment the call depth which is restricted to 1024
+	fmt.Printf("hexo: run called, depth: %v \n", in.depth)
 	in.depth++
 	defer func() { in.depth-- }()
 
@@ -215,6 +217,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 	if in.cfg.Debug {
 		defer func() {
 			if err != nil {
+				fmt.Printf("hexo: error caught on return: %v\n", err)
 				if !logged {
 					in.cfg.Tracer.CaptureState(pcCopy, op, gasCopy, cost, callContext, in.returnData, in.depth, err) //nolint:errcheck
 				} else {
@@ -240,6 +243,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		// Get the operation from the jump table and validate the stack to ensure there are
 		// enough stack items available to perform the operation.
 		op = contract.GetOp(_pc)
+
 		operation := in.jt[op]
 		cost = operation.constantGas // For tracing
 		// Validate stack
@@ -289,6 +293,9 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		res, err = operation.execute(pc, in, callContext)
 
 		if err != nil {
+			if err != errStopToken {
+				fmt.Printf("hexo: error from evm: %v \n", err)
+			}
 			break
 		}
 		_pc++
